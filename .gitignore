@@ -1,0 +1,28 @@
+# Environment files — never commit API keys
+.env
+.env.local
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Next.js
+frontend/.next/
+frontend/node_modules/
+frontend/out/
+
+# Misc
+*.docx
+*.pdf
+API.txt
+.DS_Store
+Thumbs.db
