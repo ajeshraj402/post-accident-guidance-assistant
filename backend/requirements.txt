@@ -6,3 +6,4 @@ groq>=0.37.0
 pinecone>=9.0.0
 sentence-transformers>=3.0.1
 python-dotenv>=1.0.1
+clickhouse-connect>=0.7.0

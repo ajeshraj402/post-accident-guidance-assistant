@@ -1,4 +1,5 @@
 import uuid
+import time
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
@@ -7,6 +8,7 @@ from models import AccidentScenario, ChatRequest, ChatResponse, FeedbackRequest,
 from rule_engine import check_special_cases, calculate_financial_impact
 from rag import retrieve_state_context
 from llm import get_llm_recommendation
+from analytics import log_recommendation, log_feedback
 
 app = FastAPI(
     title="Post-Accident Guidance Assistant",
@@ -20,9 +22,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# In-memory feedback store (replaced by DynamoDB in Phase 6)
-_feedback_store: list[dict] = []
 
 
 def run_pipeline(scenario: AccidentScenario) -> tuple[dict, ClaimRecommendation]:
@@ -61,22 +60,35 @@ def chat(request: ChatRequest):
             detail="Scenario data is required. Please provide accident details.",
         )
 
+    start = time.time()
     try:
         financial_calc, recommendation = run_pipeline(request.scenario)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Pipeline error: {str(e)}")
 
+    latency_ms = int((time.time() - start) * 1000)
+    session_id = str(uuid.uuid4())
+
+    log_recommendation(
+        session_id=session_id,
+        user_id=request.user_id,
+        scenario=request.scenario.model_dump(),
+        decision=recommendation.decision,
+        confidence=recommendation.confidence,
+        confidence_score=recommendation.confidence_score,
+        latency_ms=latency_ms,
+    )
+
     return ChatResponse(
         user_id=request.user_id,
         recommendation=recommendation,
         financial_calc=financial_calc,
-        session_id=str(uuid.uuid4()),
+        session_id=session_id,
     )
 
 
 @app.get("/conversation/{user_id}")
 def get_conversation(user_id: str):
-    # Stub — Phase 6 will replace this with DynamoDB lookup
     return {
         "user_id": user_id,
         "conversations": [],
@@ -86,10 +98,8 @@ def get_conversation(user_id: str):
 
 @app.post("/feedback")
 def submit_feedback(request: FeedbackRequest):
-    entry = request.model_dump()
-    _feedback_store.append(entry)
+    log_feedback(session_id=request.session_id, rating=request.rating)
     return {"status": "received", "session_id": request.session_id}
 
 
-# AWS Lambda handler — used in Phase 9 deployment
 handler = Mangum(app)
