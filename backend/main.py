@@ -52,6 +52,17 @@ def health():
     return {"status": "ok", "version": "1.0.0"}
 
 
+@app.get("/health/clickhouse")
+def health_clickhouse():
+    try:
+        from analytics import get_client
+        client = get_client()
+        result = client.query("SELECT 1").result_set[0][0]
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
+
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
     if request.scenario is None:
